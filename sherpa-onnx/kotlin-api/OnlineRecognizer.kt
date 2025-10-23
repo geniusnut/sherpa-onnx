@@ -204,6 +204,7 @@ fun getModelConfig(type: Int): OnlineModelConfig? {
                     joiner = "$modelDir/joiner-epoch-99-avg-1.onnx",
                 ),
                 tokens = "$modelDir/tokens.txt",
+                numThreads = 4,
                 modelType = "zipformer",
             )
         }

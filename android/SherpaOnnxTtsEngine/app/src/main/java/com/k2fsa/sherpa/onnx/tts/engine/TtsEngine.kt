@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.getOfflineTtsConfig
+import com.k2fsa.sherpa.onnx.getOfflineTtsConfigZipVoice
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -53,6 +54,11 @@ object TtsEngine {
     private var dataDir: String? = null
     private var assets: AssetManager? = null
     private var isKitten = false
+    
+    // For ZipVoice
+    private var textModel: String? = null
+    private var flowMatchingModel: String? = null
+    private var pinyinDict: String? = null
 
     init {
         // The purpose of such a design is to make the CI test easier
@@ -71,6 +77,12 @@ object TtsEngine {
         // For Kokoro -- begin
         voices = null
         // For Kokoro -- end
+
+        // For ZipVoice -- begin
+        textModel = null
+        flowMatchingModel = null
+        pinyinDict = null
+        // For ZipVoice -- end
 
         modelDir = null
         ruleFsts = null
@@ -176,6 +188,18 @@ object TtsEngine {
         // dataDir = "kitten-nano-en-v0_1-fp16/espeak-ng-data"
         // lang = "eng"
         // isKitten = true
+
+        //Example 12
+        // zipvoice-distill-zh-en-emilia
+        // https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/zipvoice.html
+         modelDir = "sherpa-onnx-zipvoice-distill-zh-en-emilia"
+         textModel = "text_encoder_int8.onnx"
+         flowMatchingModel = "fm_decoder_int8.onnx"
+         vocoder = "vocos_24khz.onnx"
+         pinyinDict = "pinyin.raw"
+         dataDir = "sherpa-onnx-zipvoice-distill-zh-en-emilia/espeak-ng-data"
+         lang = "zho"
+         lang2 = "eng"
     }
 
     fun createTts(context: Context) {
@@ -193,19 +217,34 @@ object TtsEngine {
             dataDir = "$newDir/$dataDir"
         }
 
-        val config = getOfflineTtsConfig(
-            modelDir = modelDir!!,
-            modelName = modelName ?: "",
-            acousticModelName = acousticModelName ?: "",
-            vocoder = vocoder ?: "",
-            voices = voices ?: "",
-            lexicon = lexicon ?: "",
-            dataDir = dataDir ?: "",
-            dictDir = "",
-            ruleFsts = ruleFsts ?: "",
-            ruleFars = ruleFars ?: "",
-            isKitten = isKitten,
-        )
+        val config = if (textModel != null && flowMatchingModel != null) {
+            // ZipVoice model
+            getOfflineTtsConfigZipVoice(
+                modelDir = modelDir!!,
+                textModel = textModel!!,
+                flowMatchingModel = flowMatchingModel!!,
+                vocoder = vocoder ?: "",
+                dataDir = dataDir ?: "",
+                pinyinDict = pinyinDict ?: "",
+                ruleFsts = ruleFsts ?: "",
+                ruleFars = ruleFars ?: "",
+            )
+        } else {
+            // Other models (VITS, Matcha, Kokoro, Kitten)
+            getOfflineTtsConfig(
+                modelDir = modelDir!!,
+                modelName = modelName ?: "",
+                acousticModelName = acousticModelName ?: "",
+                vocoder = vocoder ?: "",
+                voices = voices ?: "",
+                lexicon = lexicon ?: "",
+                dataDir = dataDir ?: "",
+                dictDir = "",
+                ruleFsts = ruleFsts ?: "",
+                ruleFars = ruleFars ?: "",
+                isKitten = isKitten,
+            )
+        }
 
         speed = PreferenceHelper(context).getSpeed()
         speakerId = PreferenceHelper(context).getSid()

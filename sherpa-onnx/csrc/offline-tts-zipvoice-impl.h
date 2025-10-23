@@ -276,7 +276,60 @@ class OfflineTtsZipvoiceImpl : public OfflineTtsImpl {
     int64_t T = mel_shape[1], C = mel_shape[2];
 
     float *mel_data = mel.GetTensorMutableData<float>();
+    // SHERPA_ONNX_LOGE("  Allocating mel_copy with malloc (total=%lld
+    // elements)",
+    //                  C * T);
+    // float *mel_copy_raw = static_cast<float *>(malloc(C * T *
+    // sizeof(float))); if (!mel_copy_raw) {
+    //   SHERPA_ONNX_LOGE("  ERROR: Failed to allocate mel_copy buffer!");
+    //   return {};
+    // }
+
+    // // Copy IMMEDIATELY
+    // SHERPA_ONNX_LOGE("  Copying %lld bytes from mel_data...",
+    //                  C * T * sizeof(float));
+    // std::memcpy(mel_copy_raw, mel_data, C * T * sizeof(float));
+
+    SHERPA_ONNX_LOGE("  feat_scale value: %.6f", feat_scale);
+    SHERPA_ONNX_LOGE("  1.0f / feat_scale = %.6f", 1.0f / feat_scale);
+
+    // CRITICAL FIX: Copy mel_data BEFORE allocating std::vector
+    // Android ONNX Runtime reclaims tensor memory during vector allocation
+    SHERPA_ONNX_LOGE("  Copying mel tensor with malloc (%lld elements)", C * T);
+    float *mel_copy_raw = static_cast<float *>(malloc(C * T * sizeof(float)));
+    if (!mel_copy_raw) {
+      SHERPA_ONNX_LOGE("  ERROR: Failed to allocate mel_copy buffer!");
+      return {};
+    }
+    std::memcpy(mel_copy_raw, mel_data, C * T * sizeof(float));
+
+    SHERPA_ONNX_LOGE("  Verification after memcpy:");
+    SHERPA_ONNX_LOGE("    mel_copy_raw[0]: %.6f", mel_copy_raw[0]);
+    SHERPA_ONNX_LOGE("    mel_copy_raw[100]: %.6f", mel_copy_raw[100]);
+    SHERPA_ONNX_LOGE("    mel_copy_raw[500]: %.6f", mel_copy_raw[500]);
+
+    // Now safe to allocate output vector
     std::vector<float> mel_permuted(C * T);
+
+    SHERPA_ONNX_LOGE("  After mel_permuted allocation:");
+    SHERPA_ONNX_LOGE("    mel_data[0]: %.6f (may be invalid)", mel_data[0]);
+    SHERPA_ONNX_LOGE("    mel_copy_raw[0]: %.6f (should be valid)",
+                     mel_copy_raw[0]);
+
+    for (int64_t c = 0; c < C; ++c) {
+      for (int64_t t = 0; t < T; ++t) {
+        int64_t src_idx = t * C + c;  // src: [T, C] (row major)
+        int64_t dst_idx = c * T + t;  // dst: [C, T] (row major)
+        mel_permuted[dst_idx] = mel_copy_raw[src_idx] / feat_scale;
+      }
+    }
+
+    free(mel_copy_raw);
+    mel_copy_raw = nullptr;
+
+    // SHERPA_ONNX_LOGE("  mel_copy_raw[0]: %.6f", mel_copy_raw[0]);
+    // SHERPA_ONNX_LOGE("  mel_copy_raw[100]: %.6f", mel_copy_raw[100]);
+    // SHERPA_ONNX_LOGE("  mel_copy_raw[500]: %.6f", mel_copy_raw[500]);
 
     for (int64_t c = 0; c < C; ++c) {
       for (int64_t t = 0; t < T; ++t) {
@@ -285,6 +338,8 @@ class OfflineTtsZipvoiceImpl : public OfflineTtsImpl {
         mel_permuted[dst_idx] = mel_data[src_idx] / feat_scale;
       }
     }
+    // free(mel_copy_raw);
+    // mel_copy_raw = nullptr;
 
     std::array<int64_t, 3> new_shape = {1, C, T};
     Ort::Value mel_new = Ort::Value::CreateTensor<float>(

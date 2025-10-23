@@ -44,12 +44,27 @@ data class OfflineTtsKittenModelConfig(
     var lengthScale: Float = 1.0f,
 )
 
+data class OfflineTtsZipVoiceModelConfig(
+    var tokens: String = "",
+    var textModel: String = "",
+    var flowMatchingModel: String = "",
+    var vocoder: String = "",
+    var dataDir: String = "",
+    var pinyinDict: String = "",
+    var featScale: Float = 0.1f,
+    var tShift: Float = 0.5f,
+    var targetRms: Float = 0.1f,
+    var guidanceScale: Float = 1.0f,
+)
+
 data class OfflineTtsModelConfig(
     var vits: OfflineTtsVitsModelConfig = OfflineTtsVitsModelConfig(),
     var matcha: OfflineTtsMatchaModelConfig = OfflineTtsMatchaModelConfig(),
     var kokoro: OfflineTtsKokoroModelConfig = OfflineTtsKokoroModelConfig(),
     var kitten: OfflineTtsKittenModelConfig = OfflineTtsKittenModelConfig(),
-    var numThreads: Int = 1,
+    var zipvoice: OfflineTtsZipVoiceModelConfig = OfflineTtsZipVoiceModelConfig(),
+
+    var numThreads: Int = 2,
     var debug: Boolean = false,
     var provider: String = "cpu",
 )
@@ -90,9 +105,18 @@ class OfflineTts(
         }
     }
 
+    fun isZeroshot() = config.model.zipvoice.textModel.isNotEmpty() &&
+        config.model.zipvoice.flowMatchingModel.isNotEmpty() &&
+        config.model.zipvoice.vocoder.isNotEmpty()
+
     fun sampleRate() = getSampleRate(ptr)
 
-    fun numSpeakers() = getNumSpeakers(ptr)
+    fun numSpeakers(): Int {
+        // If ZipVoice config is used, return 0 (no speaker selection)
+        val zip = config.model.zipvoice
+        val isZipVoice = zip.textModel.isNotEmpty() && zip.flowMatchingModel.isNotEmpty() && zip.vocoder.isNotEmpty()
+        return if (isZipVoice) 0 else getNumSpeakers(ptr)
+    }
 
     fun generate(
         text: String,
@@ -117,6 +141,56 @@ class OfflineTts(
             text = text,
             sid = sid,
             speed = speed,
+            callback = callback
+        )
+        return GeneratedAudio(
+            samples = objArray[0] as FloatArray,
+            sampleRate = objArray[1] as Int
+        )
+    }
+
+    // Zero-shot generation for ZipVoice models
+    fun generateZeroShot(
+        text: String,
+        promptText: String,
+        promptSamples: FloatArray,
+        sampleRate: Int,
+        speed: Float = 1.0f,
+        numSteps: Int = 4
+    ): GeneratedAudio {
+        val objArray = generateZeroShotImpl(
+            ptr,
+            text = text,
+            promptText = promptText,
+            promptSamples = promptSamples,
+            sampleRate = sampleRate,
+            speed = speed,
+            numSteps = numSteps
+        )
+        return GeneratedAudio(
+            samples = objArray[0] as FloatArray,
+            sampleRate = objArray[1] as Int
+        )
+    }
+
+    // Zero-shot generation with callback for ZipVoice models
+    fun generateZeroShotWithCallback(
+        text: String,
+        promptText: String,
+        promptSamples: FloatArray,
+        sampleRate: Int,
+        speed: Float = 1.0f,
+        numSteps: Int = 4,
+        callback: (samples: FloatArray) -> Int
+    ): GeneratedAudio {
+        val objArray = generateZeroShotWithCallbackImpl(
+            ptr,
+            text = text,
+            promptText = promptText,
+            promptSamples = promptSamples,
+            sampleRate = sampleRate,
+            speed = speed,
+            numSteps = numSteps,
             callback = callback
         )
         return GeneratedAudio(
@@ -180,6 +254,31 @@ class OfflineTts(
         text: String,
         sid: Int = 0,
         speed: Float = 1.0f,
+        callback: (samples: FloatArray) -> Int
+    ): Array<Any>
+
+    // The returned array has two entries:
+    //  - the first entry is an 1-D float array containing audio samples.
+    //    Each sample is normalized to the range [-1, 1]
+    //  - the second entry is the sample rate
+    private external fun generateZeroShotImpl(
+        ptr: Long,
+        text: String,
+        promptText: String,
+        promptSamples: FloatArray,
+        sampleRate: Int,
+        speed: Float = 1.0f,
+        numSteps: Int = 4
+    ): Array<Any>
+
+    private external fun generateZeroShotWithCallbackImpl(
+        ptr: Long,
+        text: String,
+        promptText: String,
+        promptSamples: FloatArray,
+        sampleRate: Int,
+        speed: Float = 1.0f,
+        numSteps: Int = 4,
         callback: (samples: FloatArray) -> Int
     ): Array<Any>
 
@@ -297,6 +396,48 @@ fun getOfflineTtsConfig(
             kokoro = kokoro,
             kitten = kitten,
             numThreads = numberOfThreads,
+            debug = true,
+            provider = "cpu",
+        ),
+        ruleFsts = ruleFsts,
+        ruleFars = ruleFars,
+    )
+}
+
+// Helper function for ZipVoice models
+fun getOfflineTtsConfigZipVoice(
+    modelDir: String,
+    textModel: String,
+    flowMatchingModel: String,
+    vocoder: String,
+    tokens: String = "tokens.txt",
+    dataDir: String = "",
+    pinyinDict: String = "",
+    ruleFsts: String = "",
+    ruleFars: String = "",
+    featScale: Float = 0.1f,
+    tShift: Float = 0.5f,
+    targetRms: Float = 0.1f,
+    guidanceScale: Float = 1.0f,
+    numThreads: Int = 4,
+): OfflineTtsConfig {
+    val zipvoice = OfflineTtsZipVoiceModelConfig(
+        tokens = "$modelDir/$tokens",
+        textModel = "$modelDir/$textModel",
+        flowMatchingModel = "$modelDir/$flowMatchingModel",
+        vocoder = "$modelDir/$vocoder",
+        dataDir = if (dataDir.isEmpty()) "" else dataDir,
+        pinyinDict = if (pinyinDict.isEmpty()) "" else "$modelDir/$pinyinDict",
+        featScale = featScale,
+        tShift = tShift,
+        targetRms = targetRms,
+        guidanceScale = guidanceScale,
+    )
+
+    return OfflineTtsConfig(
+        model = OfflineTtsModelConfig(
+            zipvoice = zipvoice,
+            numThreads = numThreads,
             debug = true,
             provider = "cpu",
         ),

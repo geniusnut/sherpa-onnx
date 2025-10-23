@@ -118,6 +118,43 @@ static OfflineTtsConfig GetOfflineTtsConfig(JNIEnv *env, jobject config,
   SHERPA_ONNX_JNI_READ_FLOAT(ans.model.kitten.length_scale, lengthScale,
                              kitten_cls, kitten);
 
+  // zipvoice
+  fid =
+      env->GetFieldID(model_config_cls, "zipvoice",
+                      "Lcom/k2fsa/sherpa/onnx/OfflineTtsZipVoiceModelConfig;");
+  jobject zipvoice = env->GetObjectField(model, fid);
+  jclass zipvoice_cls = env->GetObjectClass(zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.tokens, tokens, zipvoice_cls,
+                              zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.text_model, textModel,
+                              zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.flow_matching_model,
+                              flowMatchingModel, zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.vocoder, vocoder, zipvoice_cls,
+                              zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.data_dir, dataDir,
+                              zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.zipvoice.pinyin_dict, pinyinDict,
+                              zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.zipvoice.feat_scale, featScale,
+                             zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.zipvoice.t_shift, tShift, zipvoice_cls,
+                             zipvoice);
+
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.zipvoice.target_rms, targetRms,
+                             zipvoice_cls, zipvoice);
+
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.zipvoice.guidance_scale, guidanceScale,
+                             zipvoice_cls, zipvoice);
+
   SHERPA_ONNX_JNI_READ_INT(ans.model.num_threads, numThreads, model_config_cls,
                            model);
 
@@ -149,6 +186,7 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_newFromAsset(
     SHERPA_ONNX_LOGE("Failed to get asset manager: %p", mgr);
     return 0;
   }
+  SHERPA_ONNX_LOGE("Asset manager initialized successfully: %p", mgr);
 #endif
 
   bool ok = false;
@@ -159,16 +197,62 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_newFromAsset(
     return 0;
   }
 
+  SHERPA_ONNX_LOGE("OfflineTtsConfig obtained successfully");
   auto str_vec = sherpa_onnx::SplitString(config.ToString(), 128);
   for (const auto &s : str_vec) {
     SHERPA_ONNX_LOGE("%s", s.c_str());
   }
 
-  auto tts = new sherpa_onnx::OfflineTts(
+  // Add detailed model type detection
+  SHERPA_ONNX_LOGE("=== TTS Model Detection ===");
+  if (!config.model.vits.model.empty()) {
+    SHERPA_ONNX_LOGE("Detected VITS model: %s",
+                     config.model.vits.model.c_str());
+  }
+  if (!config.model.matcha.acoustic_model.empty()) {
+    SHERPA_ONNX_LOGE("Detected Matcha model: %s",
+                     config.model.matcha.acoustic_model.c_str());
+  }
+  if (!config.model.zipvoice.text_model.empty() &&
+      !config.model.zipvoice.flow_matching_model.empty()) {
+    SHERPA_ONNX_LOGE("Detected ZipVoice model:");
+    SHERPA_ONNX_LOGE("  - text_model: %s",
+                     config.model.zipvoice.text_model.c_str());
+    SHERPA_ONNX_LOGE("  - flow_matching_model: %s",
+                     config.model.zipvoice.flow_matching_model.c_str());
+    SHERPA_ONNX_LOGE("  - vocoder: %s", config.model.zipvoice.vocoder.c_str());
+    SHERPA_ONNX_LOGE("  - tokens: %s", config.model.zipvoice.tokens.c_str());
+    SHERPA_ONNX_LOGE("  - data_dir: %s",
+                     config.model.zipvoice.data_dir.c_str());
+    SHERPA_ONNX_LOGE("  - pinyin_dict: %s",
+                     config.model.zipvoice.pinyin_dict.c_str());
+  }
+  if (!config.model.kokoro.model.empty()) {
+    SHERPA_ONNX_LOGE("Detected Kokoro model: %s",
+                     config.model.kokoro.model.c_str());
+  }
+  if (!config.model.kitten.model.empty()) {
+    SHERPA_ONNX_LOGE("Detected Kitten model: %s",
+                     config.model.kitten.model.c_str());
+  }
+  SHERPA_ONNX_LOGE("=========================");
+
+  SHERPA_ONNX_LOGE("Creating OfflineTts instance...");
+  sherpa_onnx::OfflineTts *tts = nullptr;
+  try {
+    tts = new sherpa_onnx::OfflineTts(
 #if __ANDROID_API__ >= 9
-      mgr,
+        mgr,
 #endif
-      config);
+        config);
+    SHERPA_ONNX_LOGE("OfflineTts instance created successfully: %p", tts);
+  } catch (const std::exception &e) {
+    SHERPA_ONNX_LOGE("Exception during OfflineTts creation: %s", e.what());
+    return 0;
+  } catch (...) {
+    SHERPA_ONNX_LOGE("Unknown exception during OfflineTts creation");
+    return 0;
+  }
 
   return (jlong)tts;
 }
@@ -300,6 +384,102 @@ Java_com_k2fsa_sherpa_onnx_OfflineTts_generateWithCallbackImpl(
   env->SetObjectArrayElement(obj_arr, 1, NewInteger(env, audio.sample_rate));
 
   env->ReleaseStringUTFChars(text, p_text);
+
+  return obj_arr;
+}
+
+// Zero-shot Generate for ZipVoice models
+SHERPA_ONNX_EXTERN_C
+JNIEXPORT jobjectArray JNICALL
+Java_com_k2fsa_sherpa_onnx_OfflineTts_generateZeroShotImpl(
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jstring text, jstring prompt_text,
+    jfloatArray prompt_samples, jint sample_rate, jfloat speed,
+    jint num_steps) {
+  const char *p_text = env->GetStringUTFChars(text, nullptr);
+  const char *p_prompt_text = env->GetStringUTFChars(prompt_text, nullptr);
+
+  jfloat *p_prompt_samples =
+      env->GetFloatArrayElements(prompt_samples, nullptr);
+  jsize prompt_length = env->GetArrayLength(prompt_samples);
+
+  std::vector<float> prompt_vec(p_prompt_samples,
+                                p_prompt_samples + prompt_length);
+
+  auto tts = reinterpret_cast<sherpa_onnx::OfflineTts *>(ptr);
+  auto audio = tts->Generate(p_text, p_prompt_text, prompt_vec, sample_rate,
+                             speed, num_steps);
+
+  jfloatArray samples_arr = env->NewFloatArray(audio.samples.size());
+  env->SetFloatArrayRegion(samples_arr, 0, audio.samples.size(),
+                           audio.samples.data());
+
+  jobjectArray obj_arr = (jobjectArray)env->NewObjectArray(
+      2, env->FindClass("java/lang/Object"), nullptr);
+
+  env->SetObjectArrayElement(obj_arr, 0, samples_arr);
+  env->SetObjectArrayElement(obj_arr, 1, NewInteger(env, audio.sample_rate));
+
+  env->ReleaseStringUTFChars(text, p_text);
+  env->ReleaseStringUTFChars(prompt_text, p_prompt_text);
+  env->ReleaseFloatArrayElements(prompt_samples, p_prompt_samples, JNI_ABORT);
+
+  return obj_arr;
+}
+
+// Zero-shot Generate with callback for ZipVoice models
+SHERPA_ONNX_EXTERN_C
+JNIEXPORT jobjectArray JNICALL
+Java_com_k2fsa_sherpa_onnx_OfflineTts_generateZeroShotWithCallbackImpl(
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jstring text, jstring prompt_text,
+    jfloatArray prompt_samples, jint sample_rate, jfloat speed, jint num_steps,
+    jobject callback) {
+  const char *p_text = env->GetStringUTFChars(text, nullptr);
+  const char *p_prompt_text = env->GetStringUTFChars(prompt_text, nullptr);
+
+  jfloat *p_prompt_samples =
+      env->GetFloatArrayElements(prompt_samples, nullptr);
+  jsize prompt_length = env->GetArrayLength(prompt_samples);
+
+  std::vector<float> prompt_vec(p_prompt_samples,
+                                p_prompt_samples + prompt_length);
+
+  std::function<int32_t(const float *, int32_t, float)> callback_wrapper =
+      [env, callback](const float *samples, int32_t n,
+                      float /*progress*/) -> int {
+    jclass cls = env->GetObjectClass(callback);
+
+    jmethodID mid = env->GetMethodID(cls, "invoke", "([F)Ljava/lang/Integer;");
+    if (mid == nullptr) {
+      SHERPA_ONNX_LOGE("Failed to get the callback. Ignore it.");
+      return 1;
+    }
+
+    jfloatArray samples_arr = env->NewFloatArray(n);
+    env->SetFloatArrayRegion(samples_arr, 0, n, samples);
+
+    jobject should_continue = env->CallObjectMethod(callback, mid, samples_arr);
+    jclass jklass = env->GetObjectClass(should_continue);
+    jmethodID int_value_mid = env->GetMethodID(jklass, "intValue", "()I");
+    return env->CallIntMethod(should_continue, int_value_mid);
+  };
+
+  auto tts = reinterpret_cast<sherpa_onnx::OfflineTts *>(ptr);
+  auto audio = tts->Generate(p_text, p_prompt_text, prompt_vec, sample_rate,
+                             speed, num_steps, callback_wrapper);
+
+  jfloatArray samples_arr = env->NewFloatArray(audio.samples.size());
+  env->SetFloatArrayRegion(samples_arr, 0, audio.samples.size(),
+                           audio.samples.data());
+
+  jobjectArray obj_arr = (jobjectArray)env->NewObjectArray(
+      2, env->FindClass("java/lang/Object"), nullptr);
+
+  env->SetObjectArrayElement(obj_arr, 0, samples_arr);
+  env->SetObjectArrayElement(obj_arr, 1, NewInteger(env, audio.sample_rate));
+
+  env->ReleaseStringUTFChars(text, p_text);
+  env->ReleaseStringUTFChars(prompt_text, p_prompt_text);
+  env->ReleaseFloatArrayElements(prompt_samples, p_prompt_samples, JNI_ABORT);
 
   return obj_arr;
 }

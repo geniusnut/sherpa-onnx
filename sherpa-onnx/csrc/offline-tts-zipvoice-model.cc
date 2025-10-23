@@ -36,8 +36,19 @@ class OfflineTtsZipvoiceModel::Impl {
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
         allocator_{} {
+    SHERPA_ONNX_LOGE(
+        "OfflineTtsZipvoiceModel::Impl constructor (without manager) called");
+    SHERPA_ONNX_LOGE("  text_model: %s", config.zipvoice.text_model.c_str());
+    SHERPA_ONNX_LOGE("  flow_matching_model: %s",
+                     config.zipvoice.flow_matching_model.c_str());
+
     auto text_buf = ReadFile(config.zipvoice.text_model);
+    SHERPA_ONNX_LOGE("  text_model loaded, size: %zu bytes", text_buf.size());
+
     auto fm_buf = ReadFile(config.zipvoice.flow_matching_model);
+    SHERPA_ONNX_LOGE("  flow_matching_model loaded, size: %zu bytes",
+                     fm_buf.size());
+
     Init(text_buf.data(), text_buf.size(), fm_buf.data(), fm_buf.size());
   }
 
@@ -47,8 +58,22 @@ class OfflineTtsZipvoiceModel::Impl {
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
         allocator_{} {
+    SHERPA_ONNX_LOGE(
+        "OfflineTtsZipvoiceModel::Impl constructor (with manager) called");
+    SHERPA_ONNX_LOGE("  Manager pointer: %p", mgr);
+    SHERPA_ONNX_LOGE("  text_model: %s", config.zipvoice.text_model.c_str());
+    SHERPA_ONNX_LOGE("  flow_matching_model: %s",
+                     config.zipvoice.flow_matching_model.c_str());
+
     auto text_buf = ReadFile(mgr, config.zipvoice.text_model);
+    SHERPA_ONNX_LOGE("  text_model loaded from manager, size: %zu bytes",
+                     text_buf.size());
+
     auto fm_buf = ReadFile(mgr, config.zipvoice.flow_matching_model);
+    SHERPA_ONNX_LOGE(
+        "  flow_matching_model loaded from manager, size: %zu bytes",
+        fm_buf.size());
+
     Init(text_buf.data(), text_buf.size(), fm_buf.data(), fm_buf.size());
   }
 
@@ -184,19 +209,32 @@ class OfflineTtsZipvoiceModel::Impl {
  private:
   void Init(void *text_model_data, size_t text_model_data_length,
             void *fm_model_data, size_t fm_model_data_length) {
+    SHERPA_ONNX_LOGE("OfflineTtsZipvoiceModel::Init called");
+    SHERPA_ONNX_LOGE("  text_model_data: %p, size: %zu", text_model_data,
+                     text_model_data_length);
+    SHERPA_ONNX_LOGE("  fm_model_data: %p, size: %zu", fm_model_data,
+                     fm_model_data_length);
+
     // Init text-encoder model
+    SHERPA_ONNX_LOGE("Creating text-encoder session...");
     text_sess_ = std::make_unique<Ort::Session>(
         env_, text_model_data, text_model_data_length, sess_opts_);
+    SHERPA_ONNX_LOGE("Text-encoder session created successfully");
+
     GetInputNames(text_sess_.get(), &text_input_names_, &text_input_names_ptr_);
     GetOutputNames(text_sess_.get(), &text_output_names_,
                    &text_output_names_ptr_);
 
     // Init flow-matching model
+    SHERPA_ONNX_LOGE("Creating flow-matching session...");
     fm_sess_ = std::make_unique<Ort::Session>(env_, fm_model_data,
                                               fm_model_data_length, sess_opts_);
+    SHERPA_ONNX_LOGE("Flow-matching session created successfully");
+
     GetInputNames(fm_sess_.get(), &fm_input_names_, &fm_input_names_ptr_);
     GetOutputNames(fm_sess_.get(), &fm_output_names_, &fm_output_names_ptr_);
 
+    SHERPA_ONNX_LOGE("Reading model metadata...");
     Ort::AllocatorWithDefaultOptions allocator;  // used in the macro below
 
     Ort::ModelMetadata meta_data = text_sess_->GetModelMetadata();
@@ -218,6 +256,11 @@ class OfflineTtsZipvoiceModel::Impl {
                                             "window_length", 1024);
     SHERPA_ONNX_READ_META_DATA_WITH_DEFAULT(meta_data_.num_mels, "num_mels",
                                             100);
+    SHERPA_ONNX_LOGE("Model metadata read successfully");
+    SHERPA_ONNX_LOGE("  sample_rate: %d", meta_data_.sample_rate);
+    SHERPA_ONNX_LOGE("  feat_dim: %d", meta_data_.feat_dim);
+    SHERPA_ONNX_LOGE("  use_espeak: %d", meta_data_.use_espeak);
+    SHERPA_ONNX_LOGE("  use_pinyin: %d", meta_data_.use_pinyin);
 
     if (config_.debug) {
       std::ostringstream os;

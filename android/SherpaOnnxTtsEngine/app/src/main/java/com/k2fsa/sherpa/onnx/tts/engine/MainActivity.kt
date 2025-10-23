@@ -113,8 +113,14 @@ class MainActivity : ComponentActivity() {
                                 }
                                 val scrollState = rememberScrollState(0)
 
+                                val isZeroShot = TtsEngine.tts!!.isZeroshot()
                                 val numSpeakers = TtsEngine.tts!!.numSpeakers()
-                                if (numSpeakers > 1) {
+                                var promptText by remember { mutableStateOf("你就需要我这种专业人士的帮助，就像手无缚鸡之力的人进入雪山狩猎，一定需要最老练的猎人指导。") }
+                                var promptAudioPath by remember { mutableStateOf("/sdcard/Android/data/com.k2fsa.sherpa.onnx.tts.engine/files/prompt.wav") }
+                                var promptSamples by remember { mutableStateOf<FloatArray?>(null) }
+                                var promptSampleRate by remember { mutableStateOf(0) }
+
+                                if (!isZeroShot && numSpeakers > 1) {
                                     OutlinedTextField(
                                         value = TtsEngine.speakerIdState.value.toString(),
                                         onValueChange = {
@@ -141,11 +147,55 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+                                if (isZeroShot) {
+                                    OutlinedTextField(
+                                        value = promptText,
+                                        onValueChange = { promptText = it },
+                                        label = { Text("Prompt text (for voice cloning)") },
+                                        maxLines = 2,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 8.dp)
+                                            .wrapContentHeight(),
+                                        singleLine = false,
+                                    )
+                                    Row {
+                                        OutlinedTextField(
+                                            value = promptAudioPath,
+                                            onValueChange = { promptAudioPath = it },
+                                            label = { Text("Prompt audio path (wav)") },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Button(
+                                            modifier = Modifier.padding(start = 8.dp),
+                                            onClick = {
+                                                // TODO: Add file picker for prompt.wav if desired
+                                                // For now, just try to load the wav file from path
+                                                try {
+                                                    val file = File(promptAudioPath)
+                                                    if (file.exists()) {
+                                                        val (samples, sr) = WavFileUtil.readWavFloat(file)
+                                                        promptSamples = samples
+                                                        promptSampleRate = sr
+                                                        Toast.makeText(applicationContext, "Loaded prompt.wav", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(applicationContext, "File not found", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(applicationContext, "Failed to load wav: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        ) {
+                                            Text("Load")
+                                        }
+                                    }
+                                }
+
                                 OutlinedTextField(
                                     value = testText,
                                     onValueChange = { testText = it },
                                     label = { Text("Please input your text here") },
-                                    maxLines = 10,
+                                    maxLines = 4,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(bottom = 16.dp)
@@ -164,6 +214,12 @@ class MainActivity : ComponentActivity() {
                                                 Toast.makeText(
                                                     applicationContext,
                                                     "Please input some text to generate",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else if (isZeroShot && (promptSamples == null || promptSamples!!.isEmpty() || promptText.isBlank() || promptSampleRate == 0)) {
+                                                Toast.makeText(
+                                                    applicationContext,
+                                                    "Please load prompt.wav and enter prompt text",
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             } else {
@@ -199,13 +255,24 @@ class MainActivity : ComponentActivity() {
                                                     val timeSource = TimeSource.Monotonic
                                                     val startTime = timeSource.markNow()
 
-                                                    val audio =
+                                                    val audio = if (isZeroShot) {
+                                                        TtsEngine.tts!!.generateZeroShotWithCallback(
+                                                            text = testText,
+                                                            promptText = promptText,
+                                                            promptSamples = promptSamples!!,
+                                                            sampleRate = promptSampleRate,
+                                                            speed = TtsEngine.speed,
+                                                            numSteps = 4,
+                                                            callback = ::callback,
+                                                        )
+                                                    } else {
                                                         TtsEngine.tts!!.generateWithCallback(
                                                             text = testText,
                                                             sid = TtsEngine.speakerId,
                                                             speed = TtsEngine.speed,
                                                             callback = ::callback,
                                                         )
+                                                    }
 
                                                     val elapsed =
                                                         startTime.elapsedNow().inWholeMilliseconds.toFloat() / 1000;
@@ -224,7 +291,6 @@ class MainActivity : ComponentActivity() {
 
                                                     val filename =
                                                         application.filesDir.absolutePath + "/generated.wav"
-
 
                                                     val ok =
                                                         audio.samples.isNotEmpty() && audio.save(
