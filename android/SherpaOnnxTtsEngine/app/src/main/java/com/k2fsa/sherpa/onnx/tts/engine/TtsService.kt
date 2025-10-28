@@ -6,6 +6,7 @@ import android.speech.tts.SynthesisRequest
 import android.speech.tts.TextToSpeech
 import android.speech.tts.TextToSpeechService
 import android.util.Log
+import java.io.File
 
 /*
 https://developer.android.com/reference/java/util/Locale#getISO3Language()
@@ -54,6 +55,14 @@ Failed to get default language from engine com.k2fsa.sherpa.chapter5
 */
 
 class TtsService : TextToSpeechService() {
+    companion object {
+        const val TAG = "TtsService"
+    }
+
+    private var promptText: String = ""
+    private var promptSamples: FloatArray? = null
+    private var promptSampleRate: Int = 0
+
     override fun onCreate() {
         Log.i(TAG, "onCreate tts service")
         super.onCreate()
@@ -62,6 +71,38 @@ class TtsService : TextToSpeechService() {
         onLoadLanguage(TtsEngine.lang, "", "")
         if (TtsEngine.lang2 != null) {
             onLoadLanguage(TtsEngine.lang2, "", "")
+        }
+
+        // Initialize prompt text and samples for zero-shot TTS
+        initializePromptData()
+    }
+
+    private fun initializePromptData() {
+        val startTime = System.currentTimeMillis()
+        try {
+            // Set default prompt text for Chinese zero-shot TTS
+            promptText = "你就需要我这种专业人士的帮助，就像手无缚鸡之力的人进入雪山狩猎，一定需要最老练的猎人指导。"
+
+            // Try to load prompt audio from external storage or assets
+            val promptPath = File(getExternalFilesDir(null), "prompt.wav")
+
+            if (promptPath.exists()) {
+                Log.i(TAG, "Loading prompt audio from: ${promptPath.absolutePath}")
+                val loadStartTime = System.currentTimeMillis()
+                val (samples, sampleRate) = WavFileUtil.readWavFloat(promptPath)
+                val loadDuration = System.currentTimeMillis() - loadStartTime
+                promptSamples = samples
+                promptSampleRate = sampleRate
+                Log.i(TAG, "Prompt audio loaded successfully. Sample rate: $sampleRate, samples: ${samples.size}, load time: ${loadDuration}ms")
+            } else {
+                Log.w(TAG, "Prompt audio file not found at: ${promptPath.absolutePath}")
+                Log.w(TAG, "Zero-shot TTS will not work without prompt audio. Please place prompt.wav in: ${promptPath.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize prompt data: ${e.message}", e)
+        } finally {
+            val totalDuration = System.currentTimeMillis() - startTime
+            Log.i(TAG, "initializePromptData completed in ${totalDuration}ms")
         }
     }
 
@@ -129,9 +170,27 @@ class TtsService : TextToSpeechService() {
             return
         }
 
-        val ttsCallback: (FloatArray) -> Int = fun(floatSamples): Int {
-            // convert FloatArray to ByteArray
-            val samples = floatArrayToByteArray(floatSamples)
+        Log.i(TAG, "text: $text")
+        if (tts.isZeroshot()) {
+            val result = tts.generateZeroShotWithCallback(
+                text = text,
+                promptText = promptText,
+                promptSamples = promptSamples!!,
+                sampleRate = promptSampleRate,
+                speed = TtsEngine.speed,
+                numSteps = 4,
+                callback = { floatSamples ->
+                    // This callback is not actually used by the C++ library
+                    // Just return 1 to continue
+                    0
+                },
+            )
+            Log.d(TAG, "onSynthesizeText: sampleRate: ${result.sampleRate}, samples size: ${result.samples.size}, " +
+                    "audio length: ${result.samples.size / result.sampleRate.toFloat()} seconds")
+
+            // Process the result manually since the callback wasn't invoked
+            val samples = floatArrayToByteArray(result.samples)
+            Log.d(TAG, "Converted byte samples size: ${samples.size}")
             val maxBufferSize: Int = callback.maxBufferSize
             var offset = 0
             while (offset < samples.size) {
@@ -139,19 +198,29 @@ class TtsService : TextToSpeechService() {
                 callback.audioAvailable(samples, offset, bytesToWrite)
                 offset += bytesToWrite
             }
+        } else {
+            tts.generateWithCallback(
+                text = text,
+                sid = TtsEngine.speakerId,
+                speed = TtsEngine.speed,
+                callback = { floatSamples ->
+                    // convert FloatArray to ByteArray
+                    val samples = floatArrayToByteArray(floatSamples)
+                    Log.d(TAG, "ttsCallback: samples size: ${samples.size}")
+                    val maxBufferSize: Int = callback.maxBufferSize
+                    var offset = 0
+                    while (offset < samples.size) {
+                        val bytesToWrite = Math.min(maxBufferSize, samples.size - offset)
+                        callback.audioAvailable(samples, offset, bytesToWrite)
+                        offset += bytesToWrite
+                    }
 
-            // 1 means to continue
-            // 0 means to stop
-            return 1
+                    // 1 means to continue
+                    // 0 means to stop
+                    1
+                },
+            )
         }
-
-        Log.i(TAG, "text: $text")
-        tts.generateWithCallback(
-            text = text,
-            sid = TtsEngine.speakerId,
-            speed = TtsEngine.speed,
-            callback = ttsCallback,
-        )
 
         callback.done()
     }

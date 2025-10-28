@@ -3,6 +3,7 @@
 package com.k2fsa.sherpa.onnx.tts.engine
 
 import PreferenceHelper
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -331,6 +332,20 @@ class MainActivity : ComponentActivity() {
                                         Text("Stop")
                                     }
                                 }
+
+                                // Button to navigate to TTS Demo Activity
+                                Button(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    onClick = {
+                                        val intent = Intent(this@MainActivity, TtsDemoActivity::class.java)
+                                        startActivity(intent)
+                                    }
+                                ) {
+                                    Text("Open TTS Demo (TextToSpeech.speak)")
+                                }
+
                                 if (rtfText.isNotEmpty()) {
                                     Row {
                                         Text(rtfText)
