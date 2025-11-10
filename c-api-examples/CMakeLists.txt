@@ -101,6 +101,9 @@ target_link_libraries(telespeech-c-api sherpa-onnx-c-api)
 add_executable(vad-sense-voice-c-api vad-sense-voice-c-api.c)
 target_link_libraries(vad-sense-voice-c-api sherpa-onnx-c-api)
 
+add_executable(vad-api vad-api.c)
+target_link_libraries(vad-api sherpa-onnx-c-api)
+
 add_executable(vad-whisper-c-api vad-whisper-c-api.c)
 target_link_libraries(vad-whisper-c-api sherpa-onnx-c-api)
 
