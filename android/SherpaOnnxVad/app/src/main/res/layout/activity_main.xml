@@ -8,36 +8,125 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="bottom"
         android:orientation="vertical"
         >
 
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="10dp" />
-
+        <!-- VAD Status Indicator -->
         <LinearLayout
-            android:id="@+id/powerCircle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:background="@drawable/black_circle"
-            android:orientation="vertical" />
-
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="200dp" />
-
-        <Button
-            android:id="@+id/record_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/start" />
+            android:orientation="vertical"
+            android:padding="16dp">
 
+            <TextView
+                android:id="@+id/mode_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Mode"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
 
+            <LinearLayout
+                android:id="@+id/powerCircle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/black_circle"
+                android:orientation="vertical"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/vad_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No activity"
+                android:textSize="14sp"
+                android:layout_gravity="center_horizontal" />
+
+            <SeekBar
+                android:id="@+id/playback_progress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/current_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:00"
+                    android:textSize="12sp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/total_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:00"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:gravity="bottom">
+
+            <Button
+                android:id="@+id/select_wav_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select WAV File"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/play_wav_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Play WAV"
+                android:enabled="false"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/stop_wav_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Stop"
+                android:enabled="false"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/record_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/start" />
+
+        </LinearLayout>
 
     </LinearLayout>
-
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
