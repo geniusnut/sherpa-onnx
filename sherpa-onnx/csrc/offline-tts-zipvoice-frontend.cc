@@ -25,6 +25,7 @@
 #include "espeak-ng/speak_lib.h"
 #include "phoneme_ids.hpp"
 #include "phonemize.hpp"
+#include "sherpa-onnx/csrc/an2cn.h"
 #include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/offline-tts-zipvoice-frontend.h"
@@ -335,8 +336,13 @@ std::vector<TokenIDs> OfflineTtsZipvoiceFrontend::ConvertTextToTokenIds(
   std::vector<std::string> tokens;  // for debugging
   for (const auto &pt : parts_with_types) {
     if (pt.second == "zh") {
-      TokenizeZh(pt.first, pinyin_encoder_.get(), token2id_, &token_ids,
-                 &tokens);
+      std::string text = ConvertNumbersToChinese(pt.first);
+      if (debug_) {
+        debug_oss << "After converting numbers to Chinese: " << text << "\n";
+        SHERPA_ONNX_LOGE("%s", debug_oss.str().c_str());
+        debug_oss.str("");
+      }
+      TokenizeZh(text, pinyin_encoder_.get(), token2id_, &token_ids, &tokens);
     } else if (pt.second == "en") {
       TokenizeEn(pt.first, token2id_, voice, &token_ids, &tokens);
     } else if (pt.second == "pinyin") {

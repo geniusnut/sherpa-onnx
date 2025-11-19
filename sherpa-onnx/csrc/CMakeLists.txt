@@ -11,6 +11,7 @@ if(SHERPA_ONNX_ENABLE_PYTHON)
 endif()
 
 set(sources
+  an2cn.cc
   base64-decode.cc
   bbpe.cc
   cat.cc
@@ -679,6 +680,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
     list(APPEND sherpa_onnx_test_srcs
       offline-tts-zipvoice-frontend-test.cc
       piper-phonemize-test.cc
+      tts-an2cn-test.cc
     )
   endif()
 
