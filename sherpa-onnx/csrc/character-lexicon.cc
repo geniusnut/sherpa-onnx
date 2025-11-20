@@ -34,14 +34,6 @@
 
 namespace sherpa_onnx {
 
-static bool IsPunct(const std::string &s) {
-  static const std::unordered_set<std::string> puncts = {
-      ",",  ".",  "!",  "?", ":", "\"", "'", "，",
-      "。", "！", "？", "“", "”", "‘",  "’",
-  };
-  return puncts.count(s);
-}
-
 class CharacterLexicon::Impl {
  public:
   Impl(const std::string &lexicon, const std::string &tokens, bool debug)

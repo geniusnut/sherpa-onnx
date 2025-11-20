@@ -3,7 +3,7 @@ name: export-paraformer-to-ascend-npu
 on:
   push:
     branches:
-      - ascend-npu-310
+      - ascend-910b3
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   export-paraformer-to-rknn:
     if: github.repository_owner == 'k2-fsa' || github.repository_owner == 'csukuangfj'
-    name: ${{ matrix.framework }} ${{ matrix.soc_version }}
+    name: ${{ matrix.framework }} ${{ matrix.soc_version }} ${{ matrix.cann }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -24,27 +24,94 @@ jobs:
           - soc_version: "910B"
             image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
             framework: "FunASR"
+            cann: "8.0"
 
           - soc_version: "910B"
             image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
             framework: "WSChuan-ASR"
+            cann: "8.0"
+
+          - soc_version: "910B"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "FunASR"
+            cann: "8.2"
+
+          - soc_version: "910B"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "WSChuan-ASR"
+            cann: "8.2"
+
+          # ===== Ascend 910B2 =====
+          - soc_version: "910B2"
+            image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
+            framework: "FunASR"
+            cann: "8.0"
+
+          - soc_version: "910B2"
+            image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
+            framework: "WSChuan-ASR"
+            cann: "8.0"
+
+          - soc_version: "910B2"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "FunASR"
+            cann: "8.2"
+
+          - soc_version: "910B2"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "WSChuan-ASR"
+            cann: "8.2"
+
+          # ===== Ascend 910B3 =====
+          - soc_version: "910B3"
+            image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
+            framework: "FunASR"
+            cann: "8.0"
+
+          - soc_version: "910B3"
+            image: "gpustack/ascendai-cann:8.0.RC3-910b-ubuntu20.04-py3.9"
+            framework: "WSChuan-ASR"
+            cann: "8.0"
+
+          - soc_version: "910B3"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "FunASR"
+            cann: "8.2"
+
+          - soc_version: "910B3"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-910b-ubuntu20.04-v2"
+            framework: "WSChuan-ASR"
+            cann: "8.2"
 
           # ===== Ascend 310 =====
           - soc_version: "310P3"
-            # image: "gpustack/ascendai-cann:8.0.RC2.alpha003-310p-ubuntu20.04-py3.9"
             image: "gpustack/devel-ascendai-cann:8.0.rc3.beta1-310p-ubuntu20.04-v2"
             framework: "FunASR"
+            cann: "8.0"
 
           - soc_version: "310P3"
             # image: "gpustack/ascendai-cann:8.0.RC2.alpha003-310p-ubuntu20.04-py3.9"
             image: "gpustack/devel-ascendai-cann:8.0.rc3.beta1-310p-ubuntu20.04-v2"
             framework: "WSChuan-ASR"
+            cann: "8.0"
+
+          - soc_version: "310P3"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-310p-ubuntu20.04-v2"
+            framework: "FunASR"
+            cann: "8.2"
+
+          - soc_version: "310P3"
+            image: "gpustack/devel-ascendai-cann:8.2.rc1-310p-ubuntu20.04-v2"
+            framework: "WSChuan-ASR"
+            cann: "8.2"
 
     container:
       # image: ascendai/cann:latest
       # image: ascendai/cann:8.1.rc1-910b-ubuntu22.04-py3.10
       # see https://hub.docker.com/r/gpustack/ascendai-cann/tags?name=8.0
       # see https://hub.docker.com/r/gpustack/devel-ascendai-cann/tags?name=310p
+      # and
+      # https://quay.io/repository/ascend/cann?tab=tags
       image: ${{ matrix.image }}
 
     steps:
@@ -131,6 +198,7 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/devlib/linux/x86_64:$LD_LIBRARY_PATH
 
           soc_version=${{ matrix.soc_version }}
+          cann=${{ matrix.cann }}
 
           atc --model=./predictor.onnx \
             --framework=5 \
@@ -167,7 +235,7 @@ jobs:
 
 
           echo "collect results"
-          d=sherpa-onnx-ascend-910B-paraformer-zh-2023-03-28
+          d=sherpa-onnx-ascend-${soc_version}-cann-$cann-paraformer-zh-2023-03-28
 
           mkdir -p $d
           mkdir -p $d/test_wavs
@@ -223,6 +291,7 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/devlib/linux/x86_64:$LD_LIBRARY_PATH
 
           soc_version=${{ matrix.soc_version }}
+          cann=${{ matrix.cann }}
 
           atc --model=./predictor.onnx \
             --framework=5 \
@@ -259,7 +328,7 @@ jobs:
 
 
           echo "collect results"
-          d=sherpa-onnx-ascend-${soc_version}-paraformer-zh-2025-10-07
+          d=sherpa-onnx-ascend-${soc_version}-cann-$cann-paraformer-zh-2025-10-07
 
           mkdir -p $d
           mkdir -p $d/test_wavs
@@ -291,7 +360,7 @@ jobs:
           overwrite: true
           repo_name: k2-fsa/sherpa-onnx
           repo_token: ${{ secrets.UPLOAD_GH_SHERPA_ONNX_TOKEN }}
-          tag: asr-models
+          tag: asr-models-ascend
 
       - name: Release
         if: github.repository_owner == 'k2-fsa'
@@ -300,4 +369,4 @@ jobs:
           file_glob: true
           file: ./*.tar.bz2
           overwrite: true
-          tag: asr-models
+          tag: asr-models-ascend

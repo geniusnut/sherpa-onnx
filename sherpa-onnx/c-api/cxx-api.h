@@ -268,6 +268,10 @@ struct SHERPA_ONNX_API OfflineWenetCtcModelConfig {
   std::string model;
 };
 
+struct SHERPA_ONNX_API OfflineOmnilingualAsrCtcModelConfig {
+  std::string model;
+};
+
 struct SHERPA_ONNX_API OfflineMoonshineModelConfig {
   std::string preprocessor;
   std::string encoder;
@@ -297,6 +301,7 @@ struct SHERPA_ONNX_API OfflineModelConfig {
   OfflineZipformerCtcModelConfig zipformer_ctc;
   OfflineCanaryModelConfig canary;
   OfflineWenetCtcModelConfig wenet_ctc;
+  OfflineOmnilingualAsrCtcModelConfig omnilingual;
 };
 
 struct SHERPA_ONNX_API OfflineLMConfig {
@@ -733,6 +738,35 @@ class SHERPA_ONNX_API OfflinePunctuation
 
  private:
   explicit OfflinePunctuation(const SherpaOnnxOfflinePunctuation *p);
+};
+
+// ============================================================================
+// Online Punctuation
+// ============================================================================
+struct OnlinePunctuationModelConfig {
+  std::string cnn_bilstm;
+  std::string bpe_vocab;
+  int32_t num_threads = 1;
+  bool debug = false;
+  std::string provider = "cpu";
+};
+
+struct OnlinePunctuationConfig {
+  OnlinePunctuationModelConfig model;
+};
+
+class SHERPA_ONNX_API OnlinePunctuation
+    : public MoveOnly<OnlinePunctuation, SherpaOnnxOnlinePunctuation> {
+ public:
+  static OnlinePunctuation Create(const OnlinePunctuationConfig &config);
+
+  void Destroy(const SherpaOnnxOnlinePunctuation *p) const;
+
+  // Add punctuations to the input text and return it.
+  std::string AddPunctuation(const std::string &text) const;
+
+ private:
+  explicit OnlinePunctuation(const SherpaOnnxOnlinePunctuation *p);
 };
 
 // ============================================================================

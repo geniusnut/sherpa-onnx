@@ -4,8 +4,11 @@
 
 #include "sherpa-onnx/csrc/offline-sense-voice-model-config.h"
 
+#include <string>
+
 #include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/macros.h"
+#include "sherpa-onnx/csrc/text-utils.h"
 
 namespace sherpa_onnx {
 
@@ -18,6 +21,8 @@ void OfflineSenseVoiceModelConfig::Register(ParseOptions *po) {
   po->Register(
       "sense-voice-use-itn", &use_itn,
       "True to enable inverse text normalization. False to disable it.");
+
+  qnn_config.Register(po);
 }
 
 bool OfflineSenseVoiceModelConfig::Validate() const {
@@ -38,6 +43,10 @@ bool OfflineSenseVoiceModelConfig::Validate() const {
     }
   }
 
+  if (EndsWith(model, ".so") || EndsWith(model, ".bin")) {
+    return qnn_config.Validate();
+  }
+
   return true;
 }
 
@@ -46,6 +55,11 @@ std::string OfflineSenseVoiceModelConfig::ToString() const {
 
   os << "OfflineSenseVoiceModelConfig(";
   os << "model=\"" << model << "\", ";
+
+  if (!qnn_config.backend_lib.empty()) {
+    os << "qnn_config=" << qnn_config.ToString() << ", ";
+  }
+
   os << "language=\"" << language << "\", ";
   os << "use_itn=" << (use_itn ? "True" : "False") << ")";
 

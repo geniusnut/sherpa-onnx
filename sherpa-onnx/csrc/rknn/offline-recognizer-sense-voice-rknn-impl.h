@@ -1,4 +1,4 @@
-// sherpa-onnx/csrc/offline-recognizer-sense-voice-rknn-impl.h
+// sherpa-onnx/csrc/rknn/offline-recognizer-sense-voice-rknn-impl.h
 //
 // Copyright (c)  2025  Xiaomi Corporation
 

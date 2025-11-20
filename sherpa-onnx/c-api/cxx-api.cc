@@ -6,7 +6,9 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace sherpa_onnx::cxx {
 
@@ -266,6 +268,9 @@ static SherpaOnnxOfflineRecognizerConfig Convert(
   c.model_config.canary.use_pnc = config.model_config.canary.use_pnc;
 
   c.model_config.wenet_ctc.model = config.model_config.wenet_ctc.model.c_str();
+
+  c.model_config.omnilingual.model =
+      config.model_config.omnilingual.model.c_str();
 
   c.lm_config.model = config.lm_config.model.c_str();
   c.lm_config.scale = config.lm_config.scale;
@@ -833,6 +838,38 @@ std::string OfflinePunctuation::AddPunctuation(const std::string &text) const {
   const char *result = SherpaOfflinePunctuationAddPunct(p_, text.c_str());
   std::string ans(result);
   SherpaOfflinePunctuationFreeText(result);
+  return ans;
+}
+
+// ============================================================
+// For Online Punctuation
+// ============================================================
+OnlinePunctuation OnlinePunctuation::Create(
+    const OnlinePunctuationConfig &config) {
+  struct SherpaOnnxOnlinePunctuationConfig c;
+  memset(&c, 0, sizeof(c));
+  c.model.cnn_bilstm = config.model.cnn_bilstm.c_str();
+  c.model.bpe_vocab = config.model.bpe_vocab.c_str();
+  c.model.num_threads = config.model.num_threads;
+  c.model.debug = config.model.debug;
+  c.model.provider = config.model.provider.c_str();
+
+  const SherpaOnnxOnlinePunctuation *punct =
+      SherpaOnnxCreateOnlinePunctuation(&c);
+  return OnlinePunctuation(punct);
+}
+
+OnlinePunctuation::OnlinePunctuation(const SherpaOnnxOnlinePunctuation *p)
+    : MoveOnly<OnlinePunctuation, SherpaOnnxOnlinePunctuation>(p) {}
+
+void OnlinePunctuation::Destroy(const SherpaOnnxOnlinePunctuation *p) const {
+  SherpaOnnxDestroyOnlinePunctuation(p);
+}
+
+std::string OnlinePunctuation::AddPunctuation(const std::string &text) const {
+  const char *result = SherpaOnnxOnlinePunctuationAddPunct(p_, text.c_str());
+  std::string ans(result);
+  SherpaOnnxOnlinePunctuationFreeText(result);
   return ans;
 }
 

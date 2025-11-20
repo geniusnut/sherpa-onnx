@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # Copyright      2025  Xiaomi Corp.        (authors: Fangjun Kuang)
 
-import argparse
 from typing import Tuple
 
 import kaldi_native_fbank as knf
 import numpy as np
 import soundfile as sf
-import torch
 from ais_bench.infer.interface import InferSession
 
 
